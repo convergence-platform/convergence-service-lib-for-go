@@ -1,5 +1,6 @@
 package lib
 
+const API_NOT_IMPLEMENTED = "err_api_not_implemented"
 const API_VERSION_NOT_FOUND = "err_api_version_not_found"
 const API_INTERNAL_ERROR = "err_api_internal_error"
 const API_MISSING_REQUEST_ID = "err_api_missing_request_id"

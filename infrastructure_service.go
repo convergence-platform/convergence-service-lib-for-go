@@ -20,7 +20,7 @@ type ServiceConnectionDetailsResponse struct {
 }
 
 func (s InfrastructureMicroService) GetServiceURL(serviceName string) string {
-	infrastructureUrl := s.Service.GetConfiguration("application.discovery_server_url").(string)
+	infrastructureUrl := s.Service.GetConfiguration("application.convergence_core_service_url").(string)
 	request := ServiceConnectionDetailsRequest{
 		ServiceName: serviceName,
 	}

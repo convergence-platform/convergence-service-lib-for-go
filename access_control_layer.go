@@ -11,6 +11,12 @@ func IsSignedIn() EndpointAuthorizationHandler {
 	}
 }
 
+func IsNotSignedIn() EndpointAuthorizationHandler {
+	return func(context *fiber.Ctx, token *jwt.Token) bool {
+		return token == nil
+	}
+}
+
 func HasAuthority(authority string) EndpointAuthorizationHandler {
 	return func(context *fiber.Ctx, token *jwt.Token) bool {
 		if token == nil || token.Claims == nil {
