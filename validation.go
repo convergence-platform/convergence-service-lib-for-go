@@ -2,69 +2,93 @@ package lib
 
 import (
 	"github.com/go-playground/validator/v10"
+	"gopkg.in/yaml.v3"
+	"strconv"
 	"strings"
 )
 
-func ValidateRequestDTO(requestLog *RequestLog, request any) *ManagedApiError {
-	validate := validator.New()
+func ValidateStringContain(fl validator.FieldLevel) bool {
+	param := fl.Param()
+	value := fl.Field().String()
 
-	return ValidateRequestDTOWithCustomValidator(validate, requestLog, request)
+	return strings.Contains(value, param)
 }
 
-func ValidateRequestDTOWithCustomValidator(validate *validator.Validate, requestLog *RequestLog, request any) *ManagedApiError {
-	errs := validate.Struct(request)
-	if errs != nil {
-		result := &ManagedApiError{
-			HttpStatusCode:  400,
-			Code:            INVALID_DATA,
-			Message:         "The request input is invalid, refer to body for details.",
-			RequestId:       requestLog.GetRawRequestID(),
-			ParentRequestId: requestLog.ParentRequestIdentifier,
-		}
+func ValidateStringNotContain(fl validator.FieldLevel) bool {
+	param := fl.Param()
+	value := fl.Field().String()
 
-		body := &RequestValidationFailureDTO{
-			Errors: make([]*RequestValidationFieldFailureDTO, 0),
-		}
-		result.SetBody(body, "request_error_info")
-
-		fieldToErrorInfo := make(map[string]*RequestValidationFieldFailureDTO)
-		for _, err := range errs.(validator.ValidationErrors) {
-			var fieldInfo *RequestValidationFieldFailureDTO
-			ok := false
-
-			if fieldInfo, ok = fieldToErrorInfo[err.StructNamespace()]; !ok {
-				fieldInfo = &RequestValidationFieldFailureDTO{
-					Field:    toSnakeCase(err.Field()),
-					Location: "body",
-					Messages: make([]string, 0),
-				}
-				body.Errors = append(body.Errors, fieldInfo)
-			}
-
-			errorMessage := "Failing to pass validation: `" + err.Tag() + "`"
-			fieldInfo.Messages = append(fieldInfo.Messages, errorMessage)
-		}
-
-		return result
-	}
-
-	return nil
+	return !strings.Contains(value, param)
 }
 
-func toSnakeCase(field string) string {
-	result := make([]string, 0)
+func ValidateStringStartsWith(fl validator.FieldLevel) bool {
+	param := fl.Param()
+	value := fl.Field().String()
 
-	for i := 0; i < len(field); i++ {
-		ch := field[i]
-		if ch >= 'A' && ch <= 'Z' {
-			if i > 0 {
-				result = append(result, "_")
-			}
-			result = append(result, strings.ToLower(field[i:i+1]))
-		} else {
-			result = append(result, field[i:i+1])
-		}
+	return strings.HasPrefix(value, param)
+}
+
+func ValidateStringNotStartsWith(fl validator.FieldLevel) bool {
+	param := fl.Param()
+	value := fl.Field().String()
+
+	return !strings.HasPrefix(value, param)
+}
+
+func ValidateStringEndsWith(fl validator.FieldLevel) bool {
+	param := fl.Param()
+	value := fl.Field().String()
+
+	return strings.HasSuffix(value, param)
+}
+
+func ValidateStringNotEndsWith(fl validator.FieldLevel) bool {
+	param := fl.Param()
+	value := fl.Field().String()
+
+	return !strings.HasSuffix(value, param)
+}
+
+func ValidateIsYamlFormatted(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	result := make(map[interface{}]interface{})
+
+	err := yaml.Unmarshal([]byte(value), &result)
+	return err == nil
+}
+
+func ValidateMinimumLength(fl validator.FieldLevel) bool {
+	length, err := strconv.Atoi(fl.Param())
+	if err != nil {
+		return false
 	}
 
-	return strings.Join(result, "")
+	actualLength := getStringOrSliceLength(fl)
+
+	return actualLength >= length
+}
+
+func ValidateMaximumLength(fl validator.FieldLevel) bool {
+	length, err := strconv.Atoi(fl.Param())
+	if err != nil {
+		return false
+	}
+
+	actualLength := getStringOrSliceLength(fl)
+
+	return actualLength <= length
+}
+
+func getStringOrSliceLength(fl validator.FieldLevel) int {
+	value := fl.Field().Interface()
+	actualLength := -1
+	if strValue, ok := value.(string); ok {
+		actualLength = len(strValue)
+	} else if strPointerValue, ok := value.(*string); ok {
+		actualLength = len(*strPointerValue)
+	} else {
+		// This is a slice
+		actualLength = fl.Field().Len()
+	}
+	return actualLength
 }

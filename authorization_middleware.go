@@ -42,24 +42,24 @@ func AuthorizationMiddleware(context *fiber.Ctx) error {
 			token, managedError = isValidAuthorizationToken(*authorizationHeader)
 			if managedError != nil {
 				return convertManagedApiErrorToResponse(context, managedError)
-			} else if !token.Valid {
+			} else if token != nil && !token.Valid {
 				bodyType := "api_failure"
 				managedError = &ManagedApiError{
-					HttpStatusCode: 500,
-					Code:           API_INTERNAL_ERROR,
-					Message:        "Authorization token validation failed for unknown reason.",
-					body:           nil,
-					bodyType:       &bodyType,
+					Code:     API_INTERNAL_ERROR,
+					Message:  "Authorization token validation failed for unknown reason",
+					body:     nil,
+					bodyType: &bodyType,
 				}
 
 				return convertManagedApiErrorToResponse(context, managedError)
 			}
 		}
 
-		if endpointInfo.Authorization == nil || isAuthorized(endpointInfo, context, token) {
+		validAuthorization, customErrorMessage := isAuthorized(endpointInfo, context, token, authorizationHeader != nil)
+		if endpointInfo.Authorization == nil || validAuthorization {
 			return context.Next()
 		} else {
-			return unauthorizedResponseInvalidToken(context)
+			return unauthorizedResponseInvalidToken(context, customErrorMessage)
 		}
 	}
 }
@@ -74,7 +74,7 @@ func getEndpointInfo(url string, method string) (*ServiceEndpointAuthorizationDe
 		if urlMatched {
 			pathMatched = true
 		}
-		if info.Method == method && pathMatched {
+		if info.Method == method && urlMatched {
 			result = info
 			break
 		}
@@ -105,8 +105,13 @@ func matchURLToEndpoint(url string, epUrl string) bool {
 	}
 }
 
-func isAuthorized(info *ServiceEndpointAuthorizationDetails, context *fiber.Ctx, token *jwt.Token) bool {
-	return info.Authorization(context, token)
+func isAuthorized(info *ServiceEndpointAuthorizationDetails, context *fiber.Ctx, token *jwt.Token, hadAuthorizationHeader bool) (bool, *string) {
+	if info.Authorization == nil {
+		return true, nil
+	}
+
+	result := info.Authorization(context, token, hadAuthorizationHeader)
+	return result == nil, result
 }
 
 func convertManagedApiErrorToResponse(context *fiber.Ctx, err *ManagedApiError) error {
@@ -148,15 +153,15 @@ func getAuthorizationHeader(context *fiber.Ctx) *string {
 func isValidAuthorizationToken(authHeader string) (*jwt.Token, *ManagedApiError) {
 	bearerLength := len("Bearer ")
 	bodyType := "api_failure"
-	if !strings.HasPrefix(authHeader, "Bearer ") {
+	if !strings.HasPrefix(authHeader, "Bearer ") && !strings.HasPrefix(authHeader, "API-Key ") {
 		return nil, &ManagedApiError{
 			HttpStatusCode: 401,
 			Code:           INVALID_AUTHORIZATION_TOKEN,
-			Message:        "Service expects an authorization token in Bearer format.",
+			Message:        "Service expects an authorization token that starts wither with Bearer or API-Key.",
 			body:           nil,
 			bodyType:       &bodyType,
 		}
-	} else {
+	} else if strings.HasPrefix(authHeader, "Bearer ") {
 		token := authHeader[bearerLength:]
 		payload, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 			return authorizationConfig.PublicKey, nil
@@ -185,30 +190,39 @@ func isValidAuthorizationToken(authHeader string) (*jwt.Token, *ManagedApiError)
 				bodyType:       &bodyType,
 			}
 		}
+	} else if strings.HasPrefix(authHeader, "API-Key ") {
+		return nil, nil
 	}
 
 	return nil, &ManagedApiError{
 		HttpStatusCode: 403,
 		Code:           API_INTERNAL_ERROR,
-		Message:        "Authorization token verification failed due to unknown error.",
+		Message:        "Authorization token verification failed due to unknown error, likely an invalid token.",
 		body:           nil,
 		bodyType:       &bodyType,
 	}
 }
 
-func unauthorizedResponseInvalidToken(context *fiber.Ctx) error {
+func unauthorizedResponseInvalidToken(context *fiber.Ctx, message *string) error {
 	requestLog := InitializeRequestLogForGatewayMiddleware(context)
 
 	statusCode := 403
 	context.Status(statusCode)
 	bodyType := "failure_info"
 
+	errorMessage := ""
+	if message != nil {
+		errorMessage = *message
+	} else {
+		errorMessage = "The authorization token is invalid for path " + context.OriginalURL()
+	}
+
 	response := ApiResponse[any]{
 		Header: ResponseHeaderDTO{
 			BodyType:        &bodyType,
 			HttpStatusCode:  statusCode,
 			Code:            INVALID_AUTHORIZATION_TOKEN,
-			Message:         "The authorization token is invalid for path " + context.OriginalURL(),
+			Message:         errorMessage,
 			RequestId:       requestLog.GetRawRequestID(),
 			ParentRequestId: requestLog.ParentRequestIdentifier,
 		},

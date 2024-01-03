@@ -1,5 +1,5 @@
 package lib
 
-const LIBRARY_VERSION = "1.0.1" // not to be changed!
-const LIBRARY_BUILD_DATE = "2023-12-23 00:07:21 UTC"
-const LIBRARY_VERSION_HASH = "f14b4746bd8cde917c5fde3c9d209d20037adf3a"
+const LIBRARY_VERSION = "1.0.2" // not to be changed!
+const LIBRARY_BUILD_DATE = "2024-01-03 10:10:01 UTC"
+const LIBRARY_VERSION_HASH = "ac25878fad403231a31d3c5958d65809036b97ba"

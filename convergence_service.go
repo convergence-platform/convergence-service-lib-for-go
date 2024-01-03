@@ -22,7 +22,7 @@ import (
 
 var ServiceInstance *BaseConvergenceService
 
-type EndpointAuthorizationHandler = func(*fiber.Ctx, *jwt.Token) bool
+type EndpointAuthorizationHandler = func(*fiber.Ctx, *jwt.Token, bool) *string
 
 type ServiceAuthorityDeclaration struct {
 	UUID        uuid2.UUID
@@ -34,7 +34,6 @@ type ServiceAuthorityDeclaration struct {
 type BaseConvergenceService struct {
 	endpointsInfo          []ConvergenceEndpointInfo
 	configuration          map[string]any
-	urlToEndpointMap       map[string]*ServiceEndpointDTO
 	ServiceState           ServiceState
 	Migrations             []any
 	Authorities            []ServiceAuthorityDeclaration
@@ -42,15 +41,14 @@ type BaseConvergenceService struct {
 	ServiceVersion         string
 	ServiceVersionHash     string
 	Fiber                  *fiber.App
-	InternalEndpoints      []*ServiceEndpointDTO
-	PublicEndpoints        []*ServiceEndpointDTO
+	Endpoints              []*ServiceEndpointInfoDTO
 	endpointsAuthorization []*ServiceEndpointAuthorizationDetails
 }
 
 type ServiceEndpointAuthorizationDetails struct {
 	URL           string
 	Method        string
-	Authorization func(context *fiber.Ctx, token *jwt.Token) bool
+	Authorization func(context *fiber.Ctx, token *jwt.Token, hadAuthorizationHeader bool) *string
 }
 
 func ConstructConvergenceService(service *BaseConvergenceService, configurations embed.FS) {
@@ -60,25 +58,47 @@ func ConstructConvergenceService(service *BaseConvergenceService, configurations
 
 	ServiceInstance = service
 	service.ServiceState = ServiceState{Status: "initializing"}
-	service.urlToEndpointMap = make(map[string]*ServiceEndpointDTO)
-	service.PublicEndpoints = []*ServiceEndpointDTO{}
-	service.InternalEndpoints = []*ServiceEndpointDTO{}
+	service.Endpoints = []*ServiceEndpointInfoDTO{}
 
 	service.configuration = loadServiceConfiguration(configurations)
 }
 
 func getServiceProfile() string {
 	args := os.Args[1:]
-	result := "default"
 
 	for i, arg := range args {
 		if arg == "--profile" && i+1 < len(args) {
-			result = args[i+1]
-			break
+			return args[i+1]
 		}
 	}
 
-	return result
+	// no --profile, check env variable
+	if profile := os.Getenv("CONVERGENCE_SERVICE_PROFILE"); profile != "" {
+		return profile
+	}
+
+	return "default"
+}
+
+func (service *BaseConvergenceService) ConfigurationExists(path string) bool {
+	parts := strings.Split(path, ".")
+	var config = service.configuration
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			if _, exists := config[part]; !exists {
+				return false
+			}
+		} else {
+			if _, exists := config[part]; !exists {
+				return false
+			}
+			temp := config[part]
+			config = temp.(map[string]any)
+		}
+	}
+
+	return true
 }
 
 func (service *BaseConvergenceService) GetConfiguration(path string) any {
@@ -129,15 +149,30 @@ func (service *BaseConvergenceService) Initialize() {
 
 	printFiglet()
 	printServerPort(service)
-	service.ServiceState.Status = "initializing_db"
-	migrateDatabase(service)
-	service.ServiceState.Status = "db_initialized"
+
+	if isDatabaseEnabled(service) {
+		service.ServiceState.Status = "initializing_db"
+		migrateDatabase(service)
+		service.ServiceState.Status = "db_initialized"
+	} else {
+		fmt.Println("Service is configured to disable database initialization.")
+	}
 	saveServiceAuthorities(service)
 	service.ServiceState.Status = "initializing_service"
 	initializeCors()
 	initializeServiceMiddleware(service)
 	service.ServiceState.Status = "healthy"
 
+}
+
+func isDatabaseEnabled(service *BaseConvergenceService) bool {
+	result := true
+
+	if service.ConfigurationExists("database.disable") {
+		result = !service.GetBooleanConfiguration("database.disable")
+	}
+
+	return result
 }
 
 func (service *BaseConvergenceService) Start() {
@@ -478,24 +513,18 @@ func initializeServiceMiddleware(service *BaseConvergenceService) {
 func (service *BaseConvergenceService) RegisterRoute(method string,
 	route string,
 	handler fiber.Handler,
-	authorization EndpointAuthorizationHandler,
-	public bool) {
+	expectedAuthorizationType string,
+	exposedThroughGateway bool) {
 	method = strings.ToUpper(method)
-	var endpoint *ServiceEndpointDTO
-	if ep, ok := service.urlToEndpointMap[route]; ok {
-		endpoint = ep
-	} else {
-		endpoint = &ServiceEndpointDTO{
-			URL:     route,
-			Methods: make([]string, 0),
-		}
-		service.urlToEndpointMap[route] = endpoint
-		if public {
-			service.PublicEndpoints = append(service.PublicEndpoints, endpoint)
-		} else {
-			service.InternalEndpoints = append(service.InternalEndpoints, endpoint)
-		}
+
+	endpoint := &ServiceEndpointInfoDTO{
+		URL:                       route,
+		Method:                    method,
+		ExposedThroughGateway:     exposedThroughGateway,
+		AuthorizationTypeExpected: expectedAuthorizationType,
 	}
+
+	service.Endpoints = append(service.Endpoints, endpoint)
 
 	if method == "GET" {
 		service.Fiber.Get(formatParamsFromBraceToColon(route), handler)
@@ -513,12 +542,29 @@ func (service *BaseConvergenceService) RegisterRoute(method string,
 		panic("The method " + method + " is not recognized")
 	}
 
-	endpoint.Methods = append(endpoint.Methods, method)
 	service.endpointsAuthorization = append(service.endpointsAuthorization, &ServiceEndpointAuthorizationDetails{
 		URL:           route,
 		Method:        method,
-		Authorization: authorization,
+		Authorization: getAuthorizationHandlerFor(expectedAuthorizationType),
 	})
+}
+
+func getAuthorizationHandlerFor(authorizationType string) EndpointAuthorizationHandler {
+	if authorizationType == "@allow_all" {
+		return AllowAll()
+	} else if authorizationType == "@signed_in" {
+		return IsSignedIn()
+	} else if authorizationType == "@not_signed_in" {
+		return IsNotSignedIn()
+	} else if authorizationType == "@service_call" {
+		return IsServiceCall()
+	} else if strings.HasPrefix(authorizationType, "authority::") {
+		return HasAuthority(authorizationType)
+	} else if strings.HasPrefix(authorizationType, "service_authority::") {
+		return HasAuthority(authorizationType)
+	}
+
+	panic("Unsupported type of authorization: " + authorizationType)
 }
 
 func formatParamsFromBraceToColon(route string) string {
