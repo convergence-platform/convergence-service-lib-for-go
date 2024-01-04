@@ -52,6 +52,41 @@ func CreateBadRequestInvalidFieldProvided(errs error, requestLog *RequestLog) *M
 	return result
 }
 
+func CreateBadRequestInvalidPathVariableProvided(fieldName string, errs error, requestLog *RequestLog) *ManagedApiError {
+	result := &ManagedApiError{
+		HttpStatusCode:  400,
+		Code:            INVALID_DATA,
+		Message:         "The request input is invalid, refer to body for details.",
+		RequestId:       requestLog.GetRawRequestID(),
+		ParentRequestId: requestLog.ParentRequestIdentifier,
+	}
+
+	body := &RequestValidationFailureDTO{
+		Errors: make([]*RequestValidationFieldFailureDTO, 0),
+	}
+	result.SetBody(body, "request_error_info")
+
+	fieldToErrorInfo := make(map[string]*RequestValidationFieldFailureDTO)
+	for _, err := range errs.(validator.ValidationErrors) {
+		var fieldInfo *RequestValidationFieldFailureDTO
+		ok := false
+
+		if fieldInfo, ok = fieldToErrorInfo[err.StructNamespace()]; !ok {
+			fieldInfo = &RequestValidationFieldFailureDTO{
+				Field:    ConvertPascalToSnake(fieldName),
+				Location: "url",
+				Messages: make([]string, 0),
+			}
+			body.Errors = append(body.Errors, fieldInfo)
+		}
+
+		errorMessage := "Failing to pass validation: '" + err.Tag() + "'"
+		fieldInfo.Messages = append(fieldInfo.Messages, errorMessage)
+	}
+
+	return result
+}
+
 func ConvertPascalToSnake(pascal string) string {
 	lastLowerCase := false
 	result := ""

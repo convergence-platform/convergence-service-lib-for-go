@@ -7,6 +7,36 @@ import (
 	"strings"
 )
 
+func GetValidatorWith(validators ...string) *validator.Validate {
+	result := validator.New(validator.WithRequiredStructEnabled())
+
+	for _, name := range validators {
+		if name == "min_length" {
+			result.RegisterValidation("min_length", ValidateMinimumLength)
+		} else if name == "max_length" {
+			result.RegisterValidation("max_length", ValidateMaximumLength)
+		} else if name == "string_contain" {
+			result.RegisterValidation("string_contain", ValidateStringContain)
+		} else if name == "string_not_contain" {
+			result.RegisterValidation("string_not_contain", ValidateStringNotContain)
+		} else if name == "string_start_with" {
+			result.RegisterValidation("string_start_with", ValidateStringStartsWith)
+		} else if name == "string_not_start_with" {
+			result.RegisterValidation("string_not_start_with", ValidateStringNotStartsWith)
+		} else if name == "string_end_with" {
+			result.RegisterValidation("string_end_with", ValidateStringEndsWith)
+		} else if name == "string_not_end_with" {
+			result.RegisterValidation("string_not_end_with", ValidateStringNotEndsWith)
+		} else if name == "yaml" {
+			result.RegisterValidation("yaml", ValidateIsYamlFormatted)
+		} else {
+			panic("The validation '" + name + "' is not supported")
+		}
+	}
+
+	return result
+}
+
 func ValidateStringContain(fl validator.FieldLevel) bool {
 	param := fl.Param()
 	value := fl.Field().String()

@@ -230,7 +230,6 @@ func loadCurrentService() *LogEntryServiceInfo {
 }
 
 func FinishRequestLog[Type any](r *RequestLog, response *ApiResponse[Type]) {
-	r.EndTimestamp = time.Now().UnixMilli()
 	r.Response = response
 }
 
@@ -270,6 +269,8 @@ func (r *RequestLog) Exception(stackTrace string) {
 }
 
 func (r *RequestLog) Save() {
+	r.EndTimestamp = time.Now().UnixMilli()
+
 	if r.rawRequestID != nil {
 		mapped := convertObjectToDictionary(r).(map[string]any)
 		mapped["service_language"] = "go"
