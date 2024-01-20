@@ -196,7 +196,7 @@ func isValidAuthorizationToken(authHeader string) (*jwt.Token, *ManagedApiError)
 
 	return nil, &ManagedApiError{
 		HttpStatusCode: 403,
-		Code:           API_INTERNAL_ERROR,
+		Code:           INVALID_AUTHORIZATION_TOKEN,
 		Message:        "Authorization token verification failed due to unknown error, likely an invalid token.",
 		body:           nil,
 		bodyType:       &bodyType,
