@@ -156,7 +156,7 @@ func isValidAuthorizationToken(authHeader string) (*jwt.Token, *ManagedApiError)
 	if !strings.HasPrefix(authHeader, "Bearer ") && !strings.HasPrefix(authHeader, "API-Key ") {
 		return nil, &ManagedApiError{
 			HttpStatusCode: 401,
-			Code:           INVALID_AUTHORIZATION_TOKEN,
+			Code:           ERR_ACCESS_DENIED,
 			Message:        "Service expects an authorization token that starts wither with Bearer or API-Key.",
 			body:           nil,
 			bodyType:       &bodyType,
@@ -184,7 +184,7 @@ func isValidAuthorizationToken(authHeader string) (*jwt.Token, *ManagedApiError)
 		if err.Error() == "token signature is invalid: crypto/ecdsa: verification error" {
 			return nil, &ManagedApiError{
 				HttpStatusCode: 403,
-				Code:           INVALID_AUTHORIZATION_TOKEN,
+				Code:           ERR_ACCESS_DENIED,
 				Message:        "Authorization token is invalid, this incident will be reported.",
 				body:           nil,
 				bodyType:       &bodyType,
@@ -196,7 +196,7 @@ func isValidAuthorizationToken(authHeader string) (*jwt.Token, *ManagedApiError)
 
 	return nil, &ManagedApiError{
 		HttpStatusCode: 403,
-		Code:           INVALID_AUTHORIZATION_TOKEN,
+		Code:           ERR_ACCESS_DENIED,
 		Message:        "Authorization token verification failed due to unknown error, likely an invalid token.",
 		body:           nil,
 		bodyType:       &bodyType,
@@ -221,7 +221,7 @@ func unauthorizedResponseInvalidToken(context *fiber.Ctx, message *string) error
 		Header: ResponseHeaderDTO{
 			BodyType:        &bodyType,
 			HttpStatusCode:  statusCode,
-			Code:            INVALID_AUTHORIZATION_TOKEN,
+			Code:            ERR_ACCESS_DENIED,
 			Message:         errorMessage,
 			RequestId:       requestLog.GetRawRequestID(),
 			ParentRequestId: requestLog.ParentRequestIdentifier,

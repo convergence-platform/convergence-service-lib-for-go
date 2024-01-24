@@ -171,7 +171,7 @@ func unauthorizedResponseCantValidateToken(context *fiber.Ctx) error {
 		Header: ResponseHeaderDTO{
 			BodyType:        &bodyType,
 			HttpStatusCode:  statusCode,
-			Code:            INVALID_AUTHORIZATION_TOKEN,
+			Code:            ERR_ACCESS_DENIED,
 			Message:         "Unable to verify the validity of the Authorization token provided.",
 			RequestId:       requestLog.GetRawRequestID(),
 			ParentRequestId: requestLog.ParentRequestIdentifier,
