@@ -22,8 +22,9 @@ func UniqueRequestLogMiddleware(context *fiber.Ctx) error {
 	}
 
 	requestLog := &RequestLog{}
-	defer requestLog.Save()
 	context.Locals(LOCAL_KEY_FOR_REQUEST_LOG, requestLog)
 
-	return context.Next()
+	err := context.Next()
+	requestLog.Save()
+	return err
 }

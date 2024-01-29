@@ -70,9 +70,14 @@ func callNextHandler(context *fiber.Ctx) error {
 }
 
 func SendManagedErrorResponse(context *fiber.Ctx, err *ManagedApiError) error {
+    requestLog := InitializeRequestLogForGatewayMiddleware(context)
 	statusCode := err.HttpStatusCode
 	context.Status(statusCode)
 	bodyType := err.bodyType
+	if bodyType == nil {
+	    t := "api_failure"
+	    bodyType = &t
+	}
 
 	response := ApiResponse[any]{
 		Header: ResponseHeaderDTO{
@@ -90,6 +95,7 @@ func SendManagedErrorResponse(context *fiber.Ctx, err *ManagedApiError) error {
 		response.Body, response.Header.BodyType = err.CustomBody()
 	}
 
+    FinishRequestLog(requestLog, &response)
 	jsonString, _ := json.Marshal(response)
 
 	context.Set("Content-Type", "application/json")
@@ -115,7 +121,6 @@ func SendUnmanagedErrorResponse(context *fiber.Ctx, statusCode int, message stri
 	}
 
 	FinishRequestLog(requestLog, &response)
-
 	jsonString, _ := json.Marshal(response)
 
 	context.Set("Content-Type", "application/json")
