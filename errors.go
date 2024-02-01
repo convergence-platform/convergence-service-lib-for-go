@@ -22,3 +22,5 @@ const API_STORAGE_NONE_EMPTY_FOLDER = "err_storage_folder_none_empty"
 
 const API_SERVICE_DOWN_ERROR = "err_external_service_down"
 const API_UNPARSABLE_JSON = "err_unparseable_input"
+const ERR_CONNECTION_FAILURE = "err_connection_failure"
+const ERR_UNABLE_PARSE_SERVICE_RESPONSE = "err_unable_to_parse_service_output"

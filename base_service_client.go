@@ -113,7 +113,7 @@ func buildResponse(data []byte, client *BaseServiceClient, response *http.Respon
 			Header: ResponseHeaderDTO{
 				BodyType:        &bodyType,
 				HttpStatusCode:  response.StatusCode,
-				Code:            "err_unable_to_parse_service_output",
+				Code:            ERR_UNABLE_PARSE_SERVICE_RESPONSE,
 				Message:         "The response got from the service is not valid JSON and can not be parsed: " + err.Error(),
 				RequestId:       nil,
 				ParentRequestId: nil,
@@ -155,7 +155,7 @@ func buildFailureInfo(err error) *ApiResponse[any] {
 		Header: ResponseHeaderDTO{
 			BodyType:        &bodyType,
 			HttpStatusCode:  -1,
-			Code:            "err_connection_failure",
+			Code:            ERR_CONNECTION_FAILURE,
 			Message:         err.Error(),
 			RequestId:       nil,
 			ParentRequestId: nil,
