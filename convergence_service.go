@@ -514,7 +514,12 @@ func (service *BaseConvergenceService) RegisterRoute(method string,
 	route string,
 	handler fiber.Handler,
 	expectedAuthorizationType string,
-	exposedThroughGateway bool) {
+	exposedThroughGateway bool,
+	maxPayloadSize string,
+	timeout string,
+	maintenanceMode string,
+	rateLimitingPolicies []string,
+	accepts []string) {
 	method = strings.ToUpper(method)
 
 	endpoint := &ServiceEndpointInfoDTO{
@@ -522,6 +527,11 @@ func (service *BaseConvergenceService) RegisterRoute(method string,
 		Method:                    method,
 		ExposedThroughGateway:     exposedThroughGateway,
 		AuthorizationTypeExpected: expectedAuthorizationType,
+		MaxPayloadSize:            parseMaxPayloadSize(maxPayloadSize),
+		Timeout:                   parseTimeout(timeout),
+		RateLimitingPolicy:        parseRateLimitingPolicy(rateLimitingPolicies),
+		Accepts:                   accepts,
+		MaintenanceMode:           maintenanceMode,
 	}
 
 	service.Endpoints = append(service.Endpoints, endpoint)
@@ -547,6 +557,110 @@ func (service *BaseConvergenceService) RegisterRoute(method string,
 		Method:        method,
 		Authorization: getAuthorizationHandlerFor(expectedAuthorizationType),
 	})
+}
+
+func parseRateLimitingPolicy(policies []string) []ConvergenceEndpointRateLimitPolicy {
+	result := []ConvergenceEndpointRateLimitPolicy{}
+
+	for _, p := range policies {
+		parts := strings.Split(p, ":")
+		if len(parts) != 3 {
+			panic("The rate limit policy " + p + " is not valid.")
+		}
+
+		if parts[0] != "max_globally" && parts[0] != "max_per_session" && parts[0] != "max_per_ip" {
+			panic("The rate limit policy " + p + " is not valid.")
+		}
+		c := ConvergenceEndpointRateLimitPolicy{}
+		c.Policy = parts[0]
+		if count, err := strconv.Atoi(parts[1]); err == nil {
+			c.Count = count
+		} else {
+			panic("The rate limit policy " + p + " is not valid.")
+		}
+
+		duration := parts[2]
+		coeff := 0
+		units := make(map[string]int)
+		units["s"] = 1
+		units["m"] = 60
+		units["h"] = 3600
+
+		validUnit := false
+		for k, v := range units {
+			if strings.HasSuffix(duration, k) {
+				validUnit = true
+				coeff = v
+			}
+		}
+
+		if !validUnit {
+			panic("The rate limit policy " + p + " is not valid.")
+		}
+
+		value := duration[0 : len(duration)-1]
+		if interval, err := strconv.Atoi(value); err != nil {
+			panic("The rate limit policy " + p + " is not valid.")
+		} else {
+			c.Duration = interval * coeff
+		}
+
+		result = append(result, c)
+	}
+
+	return result
+}
+
+func parseTimeout(timeout string) int {
+	if len(timeout) <= 2 {
+		panic("The timeout " + timeout + " is not valid.")
+	}
+
+	if strings.HasSuffix(timeout, "ms") {
+		value := timeout[0 : len(timeout)-2]
+		if v, err := strconv.Atoi(value); err != nil {
+			panic("The timeout " + timeout + " is not valid.")
+		} else {
+			return v
+		}
+	} else if strings.HasSuffix(timeout, "s") {
+		value := timeout[0 : len(timeout)-1]
+		if v, err := strconv.Atoi(value); err != nil {
+			panic("The timeout " + timeout + " is not valid.")
+		} else {
+			return v * 1000
+		}
+	}
+
+	panic("The timeout " + timeout + " is not valid.")
+}
+
+func parseMaxPayloadSize(size string) int {
+	if len(size) <= 2 {
+		panic("The payload size " + size + " is not valid.")
+	}
+
+	unit := size[len(size)-2:]
+	value := size[0 : len(size)-2]
+
+	if unit != "KB" && unit != "MB" && unit != "GB" {
+		panic("The payload size " + size + " is not valid.")
+	}
+
+	if _, err := strconv.Atoi(value); err != nil {
+		panic("The payload size " + size + " is not valid.")
+	}
+	u := 0
+	if unit == "KB" {
+		u = 1024
+	} else if unit == "MB" {
+		u = 1024 * 1024
+	} else if unit == "BB" {
+		u = 1024 * 1024 * 1024
+	}
+
+	v, _ := strconv.Atoi(value)
+	return u * v
 }
 
 func getAuthorizationHandlerFor(authorizationType string) EndpointAuthorizationHandler {
