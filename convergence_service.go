@@ -23,6 +23,7 @@ import (
 type EndpointAuthorizationHandler = func(*fiber.Ctx, *jwt.Token, bool) *string
 
 var ServiceInstance *BaseConvergenceService
+var OverrideServiceProfile *string
 
 type ServiceAuthorityDeclaration struct {
 	UUID        uuid2.UUID
@@ -64,6 +65,10 @@ func ConstructConvergenceService(service *BaseConvergenceService, configurations
 }
 
 func getServiceProfile() string {
+	if OverrideServiceProfile != nil {
+		return *OverrideServiceProfile
+	}
+
 	args := os.Args[1:]
 
 	for i, arg := range args {
@@ -286,13 +291,7 @@ func printServerPort(service *BaseConvergenceService) {
 func migrateDatabase(service *BaseConvergenceService) {
 	migrations := service.Migrations
 
-	host := service.GetConfiguration("database.host")
-	port := service.GetConfiguration("database.port")
-	user := service.GetConfiguration("database.username")
-	password := service.GetConfiguration("database.password")
-	databaseName := service.GetConfiguration("database.name")
-	connectionString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, databaseName)
+	connectionString := GetDbConnectionString(service)
 	connection, err := OpenDatabaseConnection(connectionString)
 	if err != nil {
 		panic(err)
@@ -326,6 +325,17 @@ func migrateDatabase(service *BaseConvergenceService) {
 	if error != "" {
 		panic(failedMigration + " failed with error: " + error)
 	}
+}
+
+func GetDbConnectionString(service *BaseConvergenceService) string {
+	host := service.GetConfiguration("database.host")
+	port := service.GetConfiguration("database.port")
+	user := service.GetConfiguration("database.username")
+	password := service.GetConfiguration("database.password")
+	databaseName := service.GetConfiguration("database.name")
+	connectionString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, databaseName)
+	return connectionString
 }
 
 func OpenDatabaseConnection(connectionString string) (*sql.DB, error) {
