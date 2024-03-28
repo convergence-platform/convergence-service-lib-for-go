@@ -44,7 +44,7 @@ func CreateInternalJWT(service *BaseConvergenceService, authorities []string, se
 	signingKey := service.GetConfiguration("security.authentication.secret").(string)
 	signingKey = strings.Replace(signingKey, "\\n", "\n", -1)
 	privateKey := DecodePrivate(signingKey)
-	now := time.Now()
+	now := UtcNow()
 	oneMinuteLater := now.Unix() + 60
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES512, jwt.MapClaims{

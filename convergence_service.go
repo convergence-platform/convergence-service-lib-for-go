@@ -20,9 +20,9 @@ import (
 	"time"
 )
 
-var ServiceInstance *BaseConvergenceService
-
 type EndpointAuthorizationHandler = func(*fiber.Ctx, *jwt.Token, bool) *string
+
+var ServiceInstance *BaseConvergenceService
 
 type ServiceAuthorityDeclaration struct {
 	UUID        uuid2.UUID
@@ -294,10 +294,10 @@ func migrateDatabase(service *BaseConvergenceService) {
 	connectionString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		host, port, user, password, databaseName)
 	connection, err := OpenDatabaseConnection(connectionString)
-	defer connection.Close()
 	if err != nil {
 		panic(err)
 	}
+	defer connection.Close()
 
 	fmt.Println("Starting to apply database migrations:")
 	appliedDatabaseMigrations := getListOfMigrations(connection)

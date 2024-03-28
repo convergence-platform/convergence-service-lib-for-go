@@ -191,7 +191,7 @@ func createJwt(client *BaseServiceClient, authority *string, isService bool) str
 	claims := jwt.MapClaims{
 		"iss": client.CallerServiceName,
 		"sub": client.CallerServiceName,
-		"exp": time.Now().Add(60 * time.Second).Unix(),
+		"exp": UtcNow().Add(60 * time.Second).Unix(),
 	}
 
 	if isService {

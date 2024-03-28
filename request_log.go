@@ -8,7 +8,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"time"
 )
 
 const REQUEST_ID_HEADER = "X-CONVERGENCE-REQUEST-ID"
@@ -71,7 +70,7 @@ func initializeRequestLogFromContext(context *fiber.Ctx, errorOnFailure bool, pa
 	result := context.Locals(LOCAL_KEY_FOR_REQUEST_LOG).(*RequestLog)
 	var err error
 
-	result.StartTimestamp = time.Now().UnixMilli()
+	result.StartTimestamp = UtcNow().UnixMilli()
 	result.Headers = loadRequestHeaders(context)
 	result.RequestIdentifier, result.rawRequestID, err = getRequestIDFromHeader(result, isBehindGateway, context)
 	if err != nil && errorOnFailure {
@@ -256,7 +255,7 @@ func (r *RequestLog) Exception(stackTrace string) {
 	}
 
 	entry := LogEntry{
-		Timestamp:      time.Now().UnixMilli(),
+		Timestamp:      UtcNow().UnixMilli(),
 		Level:          "exception",
 		Message:        "Go panic occurred.",
 		Arguments:      nil,
@@ -269,7 +268,7 @@ func (r *RequestLog) Exception(stackTrace string) {
 }
 
 func (r *RequestLog) Save() {
-	r.EndTimestamp = time.Now().UnixMilli()
+	r.EndTimestamp = UtcNow().UnixMilli()
 
 	if r.rawRequestID != nil {
 		mapped := convertObjectToDictionary(r).(map[string]any)
@@ -352,7 +351,7 @@ func (r *RequestLog) GetRawRequestID() *uuid2.UUID {
 
 func addLogEntry(r *RequestLog, level string, message string, arguments ...any) {
 	entry := LogEntry{
-		Timestamp:      time.Now().UnixMilli(),
+		Timestamp:      UtcNow().UnixMilli(),
 		Level:          level,
 		Message:        message,
 		Arguments:      arguments,

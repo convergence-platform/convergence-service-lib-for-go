@@ -6,7 +6,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gorm_logger "gorm.io/gorm/logger"
 	"reflect"
+	"time"
 )
 
 type ConvergenceHandler = func() (any, string, error)
@@ -18,9 +20,13 @@ func RunApiMethod[Type any](requestLog *RequestLog, context *fiber.Ctx, function
 		return err
 	}
 
-	rt := reflect.TypeOf(body)
-	if rt.Kind() == reflect.Slice || rt.Kind() == reflect.Array {
-		bodyType = "list[" + bodyType + "]"
+	if body != nil {
+		rt := reflect.TypeOf(body)
+		if rt.Kind() == reflect.Slice || rt.Kind() == reflect.Array {
+			bodyType = "list[" + bodyType + "]"
+		}
+	} else {
+		bodyType = "empty"
 	}
 
 	response := ApiResponse[Type]{
@@ -113,11 +119,20 @@ func GetGormConnection() (*gorm.DB, error) {
 	connectionString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		host, port, user, password, databaseName)
 
-	if db, err = gorm.Open(postgres.Open(connectionString), &gorm.Config{}); err != nil {
+	if db, err = gorm.Open(postgres.Open(connectionString), makeGormConfiguration()); err != nil {
 		return nil, err
 	}
 
 	return db, nil
+}
+
+func makeGormConfiguration() *gorm.Config {
+	return &gorm.Config{
+		Logger: gorm_logger.Default.LogMode(gorm_logger.Silent),
+		NowFunc: func() time.Time {
+			return *UtcNow()
+		},
+	}
 }
 
 func CloseGormConnection(db *gorm.DB) {

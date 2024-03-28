@@ -19,7 +19,7 @@ func (r *RotatingFileWriter) RotateLogFile() {
 	if r.logFile != nil {
 		_ = r.logFile.Close()
 	}
-	now := time.Now()
+	now := UtcNow()
 	nowMS := now.UnixMilli()
 	tenMinutesMS := int64(10 * 60 * 1000)
 	fromMS := (nowMS / tenMinutesMS) * tenMinutesMS
@@ -59,7 +59,7 @@ func (r *RotatingFileWriter) RotateLogFile() {
 }
 
 func (r *RotatingFileWriter) Write(p []byte) (n int, err error) {
-	if time.Now().UnixMilli() > r.logFilePathValidUntil {
+	if UtcNow().UnixMilli() > r.logFilePathValidUntil {
 		r.RotateLogFile()
 	}
 
