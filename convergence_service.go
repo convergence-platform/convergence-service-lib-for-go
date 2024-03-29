@@ -52,7 +52,7 @@ type ServiceEndpointAuthorizationDetails struct {
 	Authorization func(context *fiber.Ctx, token *jwt.Token, hadAuthorizationHeader bool) *string
 }
 
-func ConstructConvergenceService(service *BaseConvergenceService, configurations embed.FS) {
+func ConstructConvergenceService(service *BaseConvergenceService, configurations *embed.FS) {
 	if ServiceInstance != nil {
 		panic("There can only be one instance/extension of ConvergenceService.")
 	}
@@ -195,14 +195,20 @@ func (service *BaseConvergenceService) GetStatus() ServiceState {
 	return service.ServiceState
 }
 
-func loadConfigurationFile(configurations embed.FS, profile string) map[string]any {
+func loadConfigurationFile(configurations *embed.FS, profile string) map[string]any {
 	fileName := "configurations/application"
 	if profile != "default" {
 		fileName += "-" + profile
 	}
 
 	fileName += ".yaml"
-	yamlString, err := configurations.ReadFile(fileName)
+	var yamlString []byte
+	var err error
+	if configurations == nil {
+		yamlString, err = os.ReadFile(fileName)
+	} else {
+		yamlString, err = configurations.ReadFile(fileName)
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -217,7 +223,7 @@ func loadConfigurationFile(configurations embed.FS, profile string) map[string]a
 	return obj
 }
 
-func loadServiceConfiguration(configurations embed.FS) map[string]any {
+func loadServiceConfiguration(configurations *embed.FS) map[string]any {
 	profile := getServiceProfile()
 
 	defaultConfiguration := loadConfigurationFile(configurations, "default")
