@@ -54,7 +54,7 @@ func NewTableColumnBlueprintDetailed(name string, columnType string, isPrimaryKe
 	return result
 }
 
-func (table TableBlueprint) AddOperationDates(createdAt bool, updatedAt bool, deletedAt bool) {
+func (table *TableBlueprint) AddOperationDates(createdAt bool, updatedAt bool, deletedAt bool) {
 	if createdAt {
 		column := NewTableColumnBlueprintDetailed("created_at",
 			"timestamp",
