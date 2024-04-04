@@ -373,7 +373,12 @@ func applyDatabaseMigration(migration any, connection *sql.DB) string {
 			error = saveMigrationState(connection, migration, command)
 		}
 	} else if casted, ok := migration.(db_migrations.DatabaseMigration); ok {
-		command := postgres.PostgresTableToSQL(casted.MigrationDDL)
+		var command string
+		if tableMigration, isTable := casted.MigrationDDL.(db_migrations.TableBlueprint); isTable {
+			command = postgres.PostgresTableToSQL(tableMigration)
+		} else if relationMigration, isRelation := casted.MigrationDDL.(db_migrations.TablesRelationshipBlueprint); isRelation {
+			command = postgres.PostgresRelationshipToSQL(relationMigration)
+		}
 		_, err := connection.Exec(command)
 		if err != nil && !casted.AllowFailure {
 			error = err.Error()

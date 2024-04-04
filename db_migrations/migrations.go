@@ -13,6 +13,6 @@ type DatabaseSeeds struct {
 type DatabaseMigration struct {
 	Name         string
 	Dependencies []string
-	MigrationDDL TableBlueprint
+	MigrationDDL any
 	AllowFailure bool
 }
