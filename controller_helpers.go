@@ -38,8 +38,12 @@ func RunApiMethod[Type any](requestLog *RequestLog, context *fiber.Ctx, function
 			RequestId:       requestLog.GetRawRequestID(),
 			ParentRequestId: requestLog.ParentRequestIdentifier,
 		},
-		Body: body.(Type),
 	}
+
+	if body != nil {
+		response.Body = body.(Type)
+	}
+
 	jsonString, err := json.Marshal(response)
 	if err != nil {
 		panic(err)
