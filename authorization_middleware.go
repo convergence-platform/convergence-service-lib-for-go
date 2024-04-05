@@ -57,6 +57,9 @@ func AuthorizationMiddleware(context *fiber.Ctx) error {
 
 		validAuthorization, customErrorMessage := isAuthorized(endpointInfo, context, token, authorizationHeader != nil)
 		if endpointInfo.Authorization == nil || validAuthorization {
+			if validAuthorization {
+				context.Locals("AUTHENTICATION_TOKEN", token)
+			}
 			return context.Next()
 		} else {
 			return unauthorizedResponseInvalidToken(context, customErrorMessage)
