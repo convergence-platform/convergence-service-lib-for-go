@@ -45,6 +45,31 @@ type RequestLog struct {
 	LogEntries              []LogEntry           `json:"log_entries"`
 	Response                any                  `json:"response"`
 	rawRequestID            *uuid2.UUID          `json:"-"`
+	logTypePrefix           string               `json:"-"`
+}
+
+func InitializeRequestLogForProcessingQueue(logPrefix string, requestIdentifier *uuid2.UUID, parentRequestIdentifier *string, queueName string, version string, versionHash string) *RequestLog {
+	queueInfo := LogEntryServiceInfo{
+		Name:        queueName,
+		Version:     ServiceInstance.ServiceVersion,
+		VersionHash: ServiceInstance.ServiceVersionHash,
+	}
+
+	return &RequestLog{
+		RequestIdentifier:       strings.ToLower(logPrefix) + "_" + requestIdentifier.String(),
+		ParentRequestIdentifier: parentRequestIdentifier,
+		CallerService:           loadCurrentService(),
+		ReceiverService:         &queueInfo,
+		StartTimestamp:          UtcNow().UnixMilli(),
+		EndTimestamp:            0,
+		Headers:                 nil,
+		URL:                     "",
+		Parameters:              nil,
+		LogEntries:              []LogEntry{},
+		Response:                nil,
+		rawRequestID:            requestIdentifier,
+		logTypePrefix:           logPrefix,
+	}
 }
 
 func InitializeRequestLogForGatewayMiddleware(context *fiber.Ctx) *RequestLog {
@@ -81,6 +106,7 @@ func initializeRequestLogFromContext(context *fiber.Ctx, errorOnFailure bool, pa
 	result.ReceiverService = loadCurrentService()
 	result.URL = context.OriginalURL()
 	result.Parameters = parameters
+	result.logTypePrefix = ServiceInstance.GetConfiguration("observability.request_id_prefix").(string)
 
 	delete(result.Headers, strings.ToLower(REQUEST_ID_HEADER))
 	delete(result.Headers, strings.ToLower(PARENT_REQUEST_ID_HEADER))
@@ -280,9 +306,8 @@ func (r *RequestLog) Save() {
 			panic(err.Error())
 		} else {
 			folder := ServiceInstance.GetConfiguration("observability.path")
-			prefix := ServiceInstance.GetConfiguration("observability.request_id_prefix").(string)
 
-			filePath := fmt.Sprintf("%s/%s_%s.crl", folder, strings.ToLower(prefix), r.GetRawRequestID().String())
+			filePath := fmt.Sprintf("%s/%s_%s.crl", folder, strings.ToLower(r.logTypePrefix), r.GetRawRequestID().String())
 			if err := os.WriteFile(filePath, []byte(jsonString), 0600); err != nil {
 				panic(err.Error())
 			}
@@ -347,6 +372,10 @@ func convertObjectToDictionary(in any) any {
 
 func (r *RequestLog) GetRawRequestID() *uuid2.UUID {
 	return r.rawRequestID
+}
+
+func (r *RequestLog) SetRawRequestID(id *uuid2.UUID) {
+	r.rawRequestID = id
 }
 
 func addLogEntry(r *RequestLog, level string, message string, arguments ...any) {
